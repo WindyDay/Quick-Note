@@ -7,7 +7,7 @@ class MANAGER
 public:
 	vector<NOTE> NoteList;
 	vector<TAG> TagList;
-private:
+
 	wstring standardizedTag(wstring tag)
 	{
 		while (tag.size() > 0)
@@ -34,12 +34,10 @@ private:
 			}
 		}
 
-		
+
 		return tag;
 	}
 
-public:
-	
 	vector<wstring> strToTagList(wstring rawTag)
 	{
 		//add defaul tag
@@ -80,6 +78,22 @@ public:
 		return tagList;
 
 	}
+	
+	//remove first element
+	wstring TagListToString(vector<wstring> tagList)
+	{
+		wstring tagString;
+		if (tagList.size() > 1)
+		{
+			for (int i = 1; i < tagList.size(); i++)
+			{
+				tagString += tagList[i] + L", ";
+			}
+		}
+		return tagString;
+
+	}
+	
 	int saveNoteToList(vector<wstring> tags, wstring content, int currNoteId = -1)
 	{
 		//save tags
@@ -96,6 +110,22 @@ public:
 					if (currNoteId == -1)//create new note
 					{
 						TagList[tagListI].Id.push_back(NoteList.size());
+					}
+					else
+					{
+						bool existedInTag = false;
+						for (int i = 0; i < TagList[tagListI].Id.size(); i++)
+						{
+							if (currNoteId == TagList[tagListI].Id[i])
+							{
+								existedInTag = true;
+								break;
+							}
+						}
+						if (existedInTag == false)
+						{
+							TagList[tagListI].Id.push_back(currNoteId);
+						}
 					}
 					existed = true;
 					break;

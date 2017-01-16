@@ -4,6 +4,8 @@
 #include "stdafx.h"
 #include "Quick Note.h"
 #include <commctrl.h>
+#include <Windowsx.h>
+
 #define MAX_LOADSTRING 100
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
@@ -16,19 +18,23 @@ WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 HWND hWndTagList;
 HWND hWndEdtNote;
 HWND hWndNoteList;
-HWND hWndEdtTag;
 HWND hWndBtnSave;
+HWND hWndCBBTag;
 MANAGER *Manager;
+
+wstring edtTagStr;
+bool updateTagStr = false;
+
 
 NOTIFYICONDATA nidApp;
 HMENU hPopMenu;
 //My prototypes
 int OnCreate(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 int OnBtnSave(MANAGER *Manager, HWND hWnd);
-int OnBtnNewNote(HWND hWndTagList, HWND hWndNoteList, HWND hWndEdtNote, HWND hWndEdtTag);
-int updateLBTag(MANAGER *Manager, HWND hWndLB);
+int OnBtnNewNote(HWND hWndTagList, HWND hWndNoteList, HWND hWndEdtNote, HWND hWndCBBTag);
+int updateLBTag(MANAGER *Manager, HWND hWndLB, HWND hWndCBBTag);
 int updateLBNotes(MANAGER *Manager, HWND hWndLB);
-int updateEdtNote(HWND hWndEdtNote, HWND hWndEdtTag, NOTE note);
+int updateEdtNote(HWND hWndEdtNote, HWND hWndCBBTag, NOTE note);
 int getCurrSltedTagIndex(MANAGER *Manager, HWND hWndTagList);
 int getCurrSelectedNoteID(MANAGER *Manager, HWND hWndTagList, HWND hWndNoteList);
 int getCurrSltedTagIndexInList(MANAGER *Manager, HWND hWndTagList);
@@ -38,7 +44,6 @@ int drawBar(HDC hdc, int x, int y, int width, int height, HBRUSH hbrush);
 int drawChart(HWND hWnd, HFONT hFont, HDC hdc, vector<TAG> tagList, int xTop, int yTop, int fullBarWidth, int barHeight, int distance);
 bool sortTagList(TAG tag1, TAG tag2);
 void doInstallHook(HWND hWnd);
-
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
@@ -166,7 +171,11 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	
+	if (updateTagStr)
+	{
+		SendMessage(hWndCBBTag, WM_SETTEXT, 0, (LPARAM)edtTagStr.c_str());
+		updateTagStr = false;
+	}
 	switch (message)
 	{
 	case TRAY_ICON_NOTIFICATION:
@@ -197,14 +206,39 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		OnCreate(hWnd, message, wParam, lParam);
 		break;
 	}
-
+	
+		
 	case WM_COMMAND:
 	{
 		int wmId = LOWORD(wParam);
 		// Parse the menu selections:
 
+		
+
 		switch (wmId)
 		{
+		case IDC_CBBOX_TAG:
+			{
+				if (HIWORD(wParam) == CBN_SELCHANGE)
+				{
+					int ItemIndex = SendMessage((HWND)lParam, (UINT)CB_GETCURSEL, (WPARAM)0, (LPARAM)0);
+					TCHAR buff[1024];
+					//wchar_t* buffer = new wchar_t[length + 1];
+					SendMessage(hWndCBBTag, WM_GETTEXT, sizeof(buff), (LPARAM)buff);
+					edtTagStr = buff;
+
+					SendMessage((HWND)lParam, (UINT)CB_GETLBTEXT, (WPARAM)ItemIndex, (LPARAM)buff);
+
+					edtTagStr += L", ";
+					edtTagStr += buff;
+					edtTagStr = Manager->TagListToString(Manager->strToTagList(edtTagStr));
+
+					SendMessage(hWndCBBTag, WM_SETTEXT, 0, (LPARAM)edtTagStr.c_str());
+					updateTagStr = true;
+				}
+
+			}
+			break;
 		case IDC_EDIT_NOTE://your edit control ID
 		{
 			if (HIWORD(wParam) == EN_CHANGE) //notification)   
@@ -215,7 +249,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		}
 		case IDC_BTN_NEW_NOTE:
 		{
-			OnBtnNewNote(hWndTagList, hWndNoteList, hWndEdtNote, hWndEdtTag);
+			OnBtnNewNote(hWndTagList, hWndNoteList, hWndEdtNote, hWndCBBTag);
 			break;
 		}
 		case IDC_BTN_SAVE:
@@ -245,11 +279,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				if (currSelectedNoteID == LB_ERR)
 				{
 					//mess
+					SendMessage(hWndEdtNote, WM_SETTEXT, 0, (LPARAM)L"");
+					SendMessage(hWndCBBTag, WM_SETTEXT, 0, (LPARAM)L"");
 					break;
 				}
 				else
 				{
-					updateEdtNote(hWndEdtNote, hWndEdtTag, Manager->NoteList[currSelectedNoteID]);
+					updateEdtNote(hWndEdtNote, hWndCBBTag, Manager->NoteList[currSelectedNoteID]);
 				}
 				break;
 			}
@@ -302,12 +338,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		}
 		break;
 	case WM_CTLCOLOREDIT:
-		if ((HWND)lParam == hWndEdtNote || (HWND)lParam == hWndEdtTag) {
+		if ((HWND)lParam == hWndEdtNote /*|| (HWND)lParam == hWndCBBTag*/) {
 			HDC hdc = (HDC)wParam;
 			SetBkMode(hdc, TRANSPARENT);
 
 			HBRUSH backgroundColor = CreateSolidBrush(RGB(255, 255, 141));
 			return (LRESULT)backgroundColor; // or any other brush you want
+		}
+		else
+		{
+			return DefWindowProc(hWnd, message, wParam, lParam);
 		}
 		break;
 	case WM_CTLCOLORLISTBOX:
@@ -318,6 +358,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 			HBRUSH backgroundColor = CreateSolidBrush(RGB(255, 255, 141));
 			return (LRESULT)backgroundColor; // or any other brush you want
+		}
+		else
+		{
+			return DefWindowProc(hWnd, message, wParam, lParam);
 		}
 		break;
 	}
@@ -364,8 +408,6 @@ INT_PTR CALLBACK Statistic(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
 
 		SendMessage(hWndStatic, WM_SETFONT, (WPARAM)hFont_Title, TRUE);
 
-
-
 		HFONT hFont = CreateFont(16, 0, 0, 0, 550, FALSE, FALSE, FALSE, ANSI_CHARSET,
 			OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
 			DEFAULT_PITCH | FF_DONTCARE, TEXT("Courier New"));
@@ -373,7 +415,6 @@ INT_PTR CALLBACK Statistic(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
 		//sort
 		vector<TAG> tagList = Manager->TagList;
 		sort(tagList.begin(), tagList.end(), sortTagList);
-		
 		
 		drawChart(hDlg, hFont, hdc, tagList, 50, 100, 350, 25, 25);
 		break;
@@ -391,7 +432,6 @@ INT_PTR CALLBACK Statistic(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
 	}
 	return (INT_PTR)FALSE;
 }
-
 
 
 int OnCreate(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -412,13 +452,17 @@ int OnCreate(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		HWND hWndStaticNoteList = CreateWindow(L"Static", L"Notes list:", WS_CHILD | WS_VISIBLE, 170, 70, 150, 20, hWnd, NULL, hInst, NULL);
 		HWND hWndStaticCurrNote = CreateWindow(L"Static", L"Current Note:", WS_CHILD | WS_VISIBLE, 330, 70, 150, 20, hWnd, NULL, hInst, NULL);
 		HWND hWndStaticAddTag = CreateWindow(L"Static", L"Tag:", WS_CHILD | WS_VISIBLE, 330, height - 100, width - 350, 20, hWnd, NULL, hInst, NULL);
+		
 
 		hWndTagList = CreateWindowEx(WS_EX_CLIENTEDGE, L"ListBox", L"", WS_CHILD | WS_VISIBLE | WS_VSCROLL | LBS_NOTIFY |LBS_SORT, 10, 100, 100, height - 160, hWnd, (HMENU)IDC_LISTBOX_TAG, hInst, NULL);
 		hWndNoteList = CreateWindowEx(WS_EX_CLIENTEDGE, L"ListBox", L"", WS_CHILD | WS_VISIBLE | WS_VSCROLL | LBS_NOTIFY, 120, 100, 200, height - 160, hWnd, (HMENU)IDC_LISTBOX_NOTE_LIST, hInst, NULL);
 		hWndEdtNote = CreateWindowEx(WS_EX_CLIENTEDGE, L"Edit", L"", WS_CHILD | WS_VISIBLE | WS_HSCROLL | WS_VSCROLL | ES_MULTILINE, 330, 100, width - 350, height - 210, hWnd, (HMENU)IDC_EDIT_NOTE, hInst, NULL);
-		hWndEdtTag = CreateWindowEx(WS_EX_CLIENTEDGE, L"Edit", L"", WS_CHILD | WS_VISIBLE, 330, height - 105, width - 450, 25, hWnd, (HMENU)IDC_EDIT_TAG, hInst, NULL);
+		//hWndCBBTag = CreateWindowEx(WS_EX_CLIENTEDGE, L"Edit", L"", WS_CHILD | WS_VISIBLE, 330, height - 105, width - 450, 25, hWnd, (HMENU)IDC_EDIT_TAG, hInst, NULL);
+		hWndCBBTag = CreateWindowEx(WS_EX_STATICEDGE, L"COMBOBOX", L"MyCombo1", CBS_DROPDOWN | WS_HSCROLL | WS_OVERLAPPED | WS_CHILD | WS_VISIBLE, 330, height - 105, width - 450, 25, hWnd, (HMENU)IDC_CBBOX_TAG, hInst, NULL); // 100 = ID of this control
+		
+		
 		hWndBtnSave = CreateWindowEx(0, L"Button", L"Save", WS_CHILD | WS_VISIBLE, 330 + width - 440, height - 105, 90, 25, hWnd, (HMENU)IDC_BTN_SAVE, hInst, NULL);
-		SendMessage(hWndEdtTag, EM_SETCUEBANNER, FALSE, (LPARAM)L"Set tags");
+		SendMessage(hWndCBBTag, EM_SETCUEBANNER, FALSE, (LPARAM)L"Set tags");
 
 		HFONT hFont = CreateFont(18, 0, 0, 0, 500, FALSE, FALSE, FALSE, ANSI_CHARSET,
 			OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
@@ -427,7 +471,7 @@ int OnCreate(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		SendMessage(hWndTagList, WM_SETFONT, (WPARAM)hFont, TRUE);
 		SendMessage(hWndNoteList, WM_SETFONT, (WPARAM)hFont, TRUE);
 		SendMessage(hWndEdtNote, WM_SETFONT, (WPARAM)hFont, TRUE);
-		SendMessage(hWndEdtTag, WM_SETFONT, (WPARAM)hFont, TRUE);
+		SendMessage(hWndCBBTag, WM_SETFONT, (WPARAM)hFont, TRUE);
 
 		hFont = CreateFont(17, 0, 0, 0, 600, FALSE, FALSE, FALSE, ANSI_CHARSET,
 			OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
@@ -447,18 +491,21 @@ int OnCreate(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		/*wstringstream ss;
 		ss << code;
 		MessageBox(hWnd, ss.str().c_str(), L"", MB_OK);*/
-		updateLBTag(Manager, hWndTagList);
+		updateLBTag(Manager, hWndTagList, hWndCBBTag);
 
+		
+		
 		return 0;
 	}
 }
 
+//-----Buttons
 int OnBtnSave(MANAGER *Manager, HWND hWnd)
 {
 	WCHAR noteData[2000];
 	WCHAR tagData[400];
 	GetWindowText(hWndEdtNote, noteData, sizeof(noteData));
-	GetWindowText(hWndEdtTag, tagData, sizeof(tagData));
+	GetWindowText(hWndCBBTag, tagData, sizeof(tagData));
 
 	int currSelectedNote = getCurrSelectedNoteID(Manager, hWndTagList, hWndNoteList);
 	if (currSelectedNote != LB_ERR)//overwrite current selected note
@@ -482,7 +529,7 @@ int OnBtnSave(MANAGER *Manager, HWND hWnd)
 		MessageBox(hWnd, L"Saved!", L"Notification", MB_OK);
 		int currSelectedTag = getCurrSltedTagIndexInList(Manager, hWndTagList);
 		int noteIndexInTag = (int)SendMessage(hWndNoteList, LB_GETCURSEL, (WPARAM)0, (LPARAM)0);
-		updateLBTag(Manager, hWndTagList);
+		updateLBTag(Manager, hWndTagList, hWndCBBTag);
 		if (currSelectedTag != LB_ERR)
 		{
 			SendMessage(hWndTagList, LB_SETCURSEL, (WPARAM)currSelectedTag, (LPARAM)0);
@@ -493,16 +540,16 @@ int OnBtnSave(MANAGER *Manager, HWND hWnd)
 	}
 	return err;
 }
-int OnBtnNewNote(HWND hWndTagList, HWND hWndNoteList, HWND hWndEdtNote, HWND hWndEdtTag)
+int OnBtnNewNote(HWND hWndTagList, HWND hWndNoteList, HWND hWndEdtNote, HWND hWndCBBTag)
 {
 	SendMessage(hWndTagList, LB_SETCURSEL, (WPARAM)0, (LPARAM)0);
 	SendMessage(hWndNoteList, LB_SETCURSEL, (WPARAM)-1, (LPARAM)0);
 	SendMessage(hWndEdtNote, WM_SETTEXT, 0, (LPARAM)L"");
-	SendMessage(hWndEdtTag, WM_SETTEXT, 0, (LPARAM)L"");
+	SendMessage(hWndCBBTag, WM_SETTEXT, 0, (LPARAM)L"");
 	return 0;
 }
 
-int updateLBTag(MANAGER *Manager, HWND hWndLB)
+int updateLBTag(MANAGER *Manager, HWND hWndLB, HWND hWndCBBTag)
 {
 	SendMessage(hWndLB, LB_RESETCONTENT, NULL, NULL);
 	wstringstream ss;
@@ -513,6 +560,33 @@ int updateLBTag(MANAGER *Manager, HWND hWndLB)
 
 		SendMessage(hWndLB, LB_ADDSTRING, 0, (LPARAM)ss.str().c_str());
 	}
+
+	//update dropdown list of tagbox
+	TCHAR buff[1024];
+	SendMessage(hWndCBBTag, WM_GETTEXT, sizeof(buff), (LPARAM)buff);
+	edtTagStr = buff;
+	SendMessage(hWndCBBTag, CB_RESETCONTENT, 0, 0);
+
+	//sort tag
+	vector<TAG> tagList = Manager->TagList;
+	sort(tagList.begin(), tagList.end(), sortTagList);
+
+	//add to dropdown list
+	if (Manager->TagList.size() > 1)
+	{
+		for (int i = 1; i < Manager->TagList.size(); i++)
+		{
+			SendMessage(hWndCBBTag, (UINT)CB_ADDSTRING, (WPARAM)0, (LPARAM)Manager->TagList[i].TagName.c_str());
+		}
+	}
+
+	
+	edtTagStr += L", ";
+	edtTagStr += buff;
+	edtTagStr = Manager->TagListToString(Manager->strToTagList(edtTagStr));
+
+	SendMessage(hWndCBBTag, WM_SETTEXT, 0, (LPARAM)edtTagStr.c_str());
+
 	return 0;
 }
 int updateLBNotes(MANAGER *Manager, HWND hWndLB)
@@ -545,9 +619,12 @@ int updateLBNotes(MANAGER *Manager, HWND hWndLB)
 			SendMessage(hWndLB, LB_ADDSTRING, 0, (LPARAM)wsNotePreview.c_str());
 		}
 	}
+	//
+	SendMessage(hWndEdtNote, WM_SETTEXT, 0, (LPARAM)L"");
+	SendMessage(hWndCBBTag, WM_SETTEXT, 0, (LPARAM)L"");
 	return 0;
 }
-int updateEdtNote(HWND hWndEdtNote, HWND hWndEdtTag, NOTE note)
+int updateEdtNote(HWND hWndEdtNote, HWND hWndCBBTag, NOTE note)
 {
 	SendMessage(hWndEdtNote, WM_SETTEXT, 0, (LPARAM)note.Content.c_str());
 
@@ -557,7 +634,8 @@ int updateEdtNote(HWND hWndEdtNote, HWND hWndEdtTag, NOTE note)
 		tag += note.Tag[i] + L", ";
 	}
 
-	SendMessage(hWndEdtTag, WM_SETTEXT, 0, (LPARAM)tag.c_str());
+	tag = Manager->TagListToString(Manager->strToTagList(tag));
+	SendMessage(hWndCBBTag, WM_SETTEXT, 0, (LPARAM)tag.c_str());
 
 	return 0;
 }
@@ -619,6 +697,7 @@ int getCurrSltedTagIndexInList(MANAGER *Manager, HWND hWndTagList)
 	return itemIndex;
 }
 
+//--------------draw chart funcs
 int drawChart(HWND hWnd, HFONT hFont, HDC hdc, vector<TAG> tagList, int xTop, int yTop, int fullBarWidth, int barHeight, int distance)
 {
 	int txtBoxWidth = 300;
@@ -723,6 +802,7 @@ static RECT createRect(LONG left, LONG top, LONG right, LONG bottom)
 	return rect;
 }
 bool sortTagList(TAG tag1, TAG tag2) { return tag1.Id.size() > tag2.Id.size(); }
+//--------------draw chart funcs
 
 void doInstallHook(HWND hWnd)
 {
