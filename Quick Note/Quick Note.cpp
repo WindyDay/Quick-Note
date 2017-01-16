@@ -1,4 +1,4 @@
-// Quick Note.cpp : Defines the entry point for the application.
+﻿// Quick Note.cpp : Defines the entry point for the application.
 //
 
 #include "stdafx.h"
@@ -37,6 +37,8 @@ float percentOf(TAG tag, vector<TAG> tagList);
 int drawBar(HDC hdc, int x, int y, int width, int height, HBRUSH hbrush);
 int drawChart(HWND hWnd, HFONT hFont, HDC hdc, vector<TAG> tagList, int xTop, int yTop, int fullBarWidth, int barHeight, int distance);
 bool sortTagList(TAG tag1, TAG tag2);
+void doInstallHook(HWND hWnd);
+
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
@@ -294,9 +296,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			ShowWindow(hWnd, SW_HIDE); //hWnd is the handle of the application window
 			return TRUE;
 		}
+		else
+		{
+			return DefWindowProc(hWnd, message, wParam, lParam);
+		}
 		break;
 	case WM_CTLCOLOREDIT:
-		if ((HWND)lParam == hWndEdtNote) {
+		if ((HWND)lParam == hWndEdtNote || (HWND)lParam == hWndEdtTag) {
 			HDC hdc = (HDC)wParam;
 			SetBkMode(hdc, TRANSPARENT);
 
@@ -304,6 +310,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			return (LRESULT)backgroundColor; // or any other brush you want
 		}
 		break;
+	case WM_CTLCOLORLISTBOX:
+	{
+		if ((HWND)lParam == hWndNoteList || (HWND)lParam == hWndTagList) {
+			HDC hdc = (HDC)wParam;
+			SetBkMode(hdc, TRANSPARENT);
+
+			HBRUSH backgroundColor = CreateSolidBrush(RGB(255, 255, 141));
+			return (LRESULT)backgroundColor; // or any other brush you want
+		}
+		break;
+	}
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
 	}
@@ -335,34 +352,30 @@ INT_PTR CALLBACK Statistic(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
 	UNREFERENCED_PARAMETER(lParam);
 	switch (message)
 	{
-	case WM_CREATE:
-	{
-		
-		break;
-	}
 	case WM_PAINT:
 	{
 		PAINTSTRUCT ps;
 		HDC hdc = BeginPaint(hDlg, &ps);
-		HFONT hFont_Title = CreateFont(16, 0, 0, 0, 550, FALSE, FALSE, FALSE, ANSI_CHARSET,
+		HFONT hFont_Title = CreateFont(30, 0, 0, 0, 1550, FALSE, FALSE, FALSE, ANSI_CHARSET,
 			OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
 			DEFAULT_PITCH | FF_DONTCARE, TEXT("Courier New"));
 
-		HWND hWndStatic = CreateWindow(L"Static", L"Top 5 most used tag", WS_CHILD | WS_VISIBLE, 0, 0, 150, 30, hDlg, NULL, hInst, NULL);
+		HWND hWndStatic = CreateWindow(L"Static", L"TOP 5 USED TAGS", WS_CHILD | WS_VISIBLE| SS_CENTER, 0, 30, 800, 30, hDlg, NULL, hInst, NULL);
 
+		SendMessage(hWndStatic, WM_SETFONT, (WPARAM)hFont_Title, TRUE);
 
 
 
 		HFONT hFont = CreateFont(16, 0, 0, 0, 550, FALSE, FALSE, FALSE, ANSI_CHARSET,
 			OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
 			DEFAULT_PITCH | FF_DONTCARE, TEXT("Courier New"));
+
 		//sort
 		vector<TAG> tagList = Manager->TagList;
 		sort(tagList.begin(), tagList.end(), sortTagList);
 		
 		
-		SendMessage(hWndStatic, WM_SETFONT, (WPARAM)hFont, TRUE);
-		drawChart(hDlg, hFont, hdc, tagList, 50, 50, 350, 25, 25);
+		drawChart(hDlg, hFont, hdc, tagList, 50, 100, 350, 25, 25);
 		break;
 	}
 	case WM_INITDIALOG:
@@ -380,8 +393,10 @@ INT_PTR CALLBACK Statistic(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
 }
 
 
+
 int OnCreate(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+	doInstallHook(hWnd);
 	RECT rect;
 	if (GetWindowRect(hWnd, &rect))
 	{
@@ -466,11 +481,13 @@ int OnBtnSave(MANAGER *Manager, HWND hWnd)
 	{
 		MessageBox(hWnd, L"Saved!", L"Notification", MB_OK);
 		int currSelectedTag = getCurrSltedTagIndexInList(Manager, hWndTagList);
+		int noteIndexInTag = (int)SendMessage(hWndNoteList, LB_GETCURSEL, (WPARAM)0, (LPARAM)0);
 		updateLBTag(Manager, hWndTagList);
 		if (currSelectedTag != LB_ERR)
 		{
 			SendMessage(hWndTagList, LB_SETCURSEL, (WPARAM)currSelectedTag, (LPARAM)0);
 			updateLBNotes(Manager, hWndNoteList);
+			SendMessage(hWndNoteList, LB_SETCURSEL, (WPARAM)noteIndexInTag, (LPARAM)0);
 
 		}
 	}
@@ -484,7 +501,6 @@ int OnBtnNewNote(HWND hWndTagList, HWND hWndNoteList, HWND hWndEdtNote, HWND hWn
 	SendMessage(hWndEdtTag, WM_SETTEXT, 0, (LPARAM)L"");
 	return 0;
 }
-
 
 int updateLBTag(MANAGER *Manager, HWND hWndLB)
 {
@@ -623,7 +639,7 @@ int drawChart(HWND hWnd, HFONT hFont, HDC hdc, vector<TAG> tagList, int xTop, in
 	int loopTime = tagList.size();
 	if (loopTime > 6)//show top 5 most used tags
 	{
-		loopTime = 5;
+		loopTime = 6;
 	}
 	for(int i = 1; i <loopTime; i++)
 	{
@@ -686,8 +702,12 @@ float percentOf(TAG tag, vector<TAG> tagList)
 		return 0;
 	}
 
-	long double sum = tagList[0].Id.size();
-	
+
+	long double sum = 0;
+	for (int i = 1; i < tagList.size(); i++)
+	{
+		sum += tagList[i].Id.size();
+	}
 
 	float result = tag.Id.size() *1.0/ sum;
 	return  result;
@@ -703,3 +723,23 @@ static RECT createRect(LONG left, LONG top, LONG right, LONG bottom)
 	return rect;
 }
 bool sortTagList(TAG tag1, TAG tag2) { return tag1.Id.size() > tag2.Id.size(); }
+
+void doInstallHook(HWND hWnd)
+{
+	// gọi hàm DLL theo kiểu Run-time
+	// Định nghĩa prototype của hàm
+	typedef VOID(*MYPROC)(HWND);
+
+	HINSTANCE hinstLib;
+	MYPROC ProcAddr;
+
+	// load DLL và lấy handle của DLL module
+	hinstLib = LoadLibrary(L"HookFunction.dll");
+	// Nếu load thành công, lấy địa chỉ của hàm DrawCircle trong DLL
+	if (hinstLib != NULL) {
+		ProcAddr = (MYPROC)GetProcAddress(hinstLib, "_installKeyBoardHook");
+		// Nếu lấy được địa chỉ hàm, gọi thực hiện hàm
+		if (ProcAddr != NULL)
+			ProcAddr(hWnd);
+	}
+}

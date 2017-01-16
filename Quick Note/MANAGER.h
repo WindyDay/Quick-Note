@@ -80,7 +80,7 @@ public:
 		return tagList;
 
 	}
-	int saveNoteToList(vector<wstring> tags, wstring content, int newNotePos = -1)
+	int saveNoteToList(vector<wstring> tags, wstring content, int currNoteId = -1)
 	{
 		//save tags
 		bool existed = false;
@@ -93,7 +93,7 @@ public:
 				//if existed, push new note id to tag
 				if (tags[tagI] == TagList[tagListI].TagName)
 				{
-					if (newNotePos == -1)//create new note
+					if (currNoteId == -1)//create new note
 					{
 						TagList[tagListI].Id.push_back(NoteList.size());
 					}
@@ -105,13 +105,23 @@ public:
 			// if tag is not exist in tags list, push new tag
 			if (existed == false)
 			{
-				TAG newTag(tags[tagI], NoteList.size());
-				TagList.push_back(newTag);
+				if (currNoteId != -1)
+				{
+					TAG newTag(tags[tagI], currNoteId);
+					TagList.push_back(newTag);
+
+				}
+				else
+				{
+					TAG newTag(tags[tagI], NoteList.size());
+					TagList.push_back(newTag);
+
+				}
 			}
 		}
 
 		//Save note
-		if (newNotePos == -1)//create new note
+		if (currNoteId == -1)//create new note
 		{
 			NOTE newNote(NoteList.size(), tags, content);
 			NoteList.push_back(newNote);
@@ -119,8 +129,8 @@ public:
 		}
 		else//override
 		{
-			NOTE newNote(newNotePos, tags, content);
-			NoteList[newNotePos] = newNote;
+			NOTE newNote(currNoteId, tags, content);
+			NoteList[currNoteId] = newNote;
 		}
 		return 0;
 	}
