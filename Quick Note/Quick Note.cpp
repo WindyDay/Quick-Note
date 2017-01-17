@@ -212,9 +212,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	{
 		int wmId = LOWORD(wParam);
 		// Parse the menu selections:
-
-		
-
 		switch (wmId)
 		{
 		case IDC_CBBOX_TAG:

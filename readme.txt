@@ -85,6 +85,9 @@ Dòng sự kiện phụ:
 	
 	
 Screen recording:
-https://www.youtube.com/watch?v=b4R_ieBxTSk
+https://www.youtube.com/watch?v=Xu6r01aN7Fw
+
+Github:
+https://github.com/WindyDay/Quick-Note/
 		
 IDE: Visual Studio 2015
