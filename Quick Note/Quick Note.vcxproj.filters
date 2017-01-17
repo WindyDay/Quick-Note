@@ -54,10 +54,7 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <Image Include="small.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="Quick Note.ico">
+    <Image Include="Notepad2.ico">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>

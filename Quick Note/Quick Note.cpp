@@ -110,12 +110,12 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     wcex.cbClsExtra     = 0;
     wcex.cbWndExtra     = 0;
     wcex.hInstance      = hInstance;
-    wcex.hIcon          = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_QUICKNOTE));
+    wcex.hIcon          = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON2));
     wcex.hCursor        = LoadCursor(nullptr, IDC_ARROW);
     wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
     wcex.lpszMenuName   = MAKEINTRESOURCEW(IDC_QUICKNOTE);
     wcex.lpszClassName  = szWindowClass;
-    wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
+    wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_ICON2));
 
     return RegisterClassExW(&wcex);
 }
@@ -142,11 +142,11 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
       return FALSE;
    }
    HICON hMainIcon;
-   hMainIcon = LoadIcon(hInstance, (LPCTSTR)MAKEINTRESOURCE(IDI_QUICKNOTE));
+   hMainIcon = LoadIcon(hInstance, (LPCTSTR)MAKEINTRESOURCE(IDI_ICON2));
 
    nidApp.cbSize = sizeof(NOTIFYICONDATA); // sizeof the struct in bytes 
    nidApp.hWnd = (HWND)hWnd;              //handle of the window which will process this app. messages 
-   nidApp.uID = IDC_MYICON;           //ID of the icon that will appear in the system tray 
+   nidApp.uID = IDI_ICON2;           //ID of the icon that will appear in the system tray 
    nidApp.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP; //ORing of all the flags 
    nidApp.hIcon = hMainIcon; // handle of the Icon to be displayed, obtained from LoadIcon 
    nidApp.uCallbackMessage = TRAY_ICON_NOTIFICATION;
@@ -536,6 +536,17 @@ int OnBtnSave(MANAGER *Manager, HWND hWnd)
 			updateLBNotes(Manager, hWndNoteList);
 			SendMessage(hWndNoteList, LB_SETCURSEL, (WPARAM)noteIndexInTag, (LPARAM)0);
 
+			int currSelectedNoteID = getCurrSelectedNoteID(Manager, hWndTagList, hWndNoteList);
+			if (currSelectedNoteID != LB_ERR)
+			{
+				updateEdtNote(hWndEdtNote, hWndCBBTag, Manager->NoteList[currSelectedNoteID]);
+			}
+		}
+		else
+		{
+			SendMessage(hWndEdtNote, WM_SETTEXT, 0, (LPARAM)L"");
+			SendMessage(hWndCBBTag, WM_SETTEXT, 0, (LPARAM)L"");
+
 		}
 	}
 	return err;
@@ -572,11 +583,11 @@ int updateLBTag(MANAGER *Manager, HWND hWndLB, HWND hWndCBBTag)
 	sort(tagList.begin(), tagList.end(), sortTagList);
 
 	//add to dropdown list
-	if (Manager->TagList.size() > 1)
+	if (tagList.size() > 1)
 	{
-		for (int i = 1; i < Manager->TagList.size(); i++)
+		for (int i = 1; i < tagList.size(); i++)
 		{
-			SendMessage(hWndCBBTag, (UINT)CB_ADDSTRING, (WPARAM)0, (LPARAM)Manager->TagList[i].TagName.c_str());
+			SendMessage(hWndCBBTag, (UINT)CB_ADDSTRING, (WPARAM)0, (LPARAM)tagList[i].TagName.c_str());
 		}
 	}
 

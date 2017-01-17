@@ -166,8 +166,7 @@
     <ResourceCompile Include="Quick Note.rc" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="Quick Note.ico" />
-    <Image Include="small.ico" />
+    <Image Include="Notepad2.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

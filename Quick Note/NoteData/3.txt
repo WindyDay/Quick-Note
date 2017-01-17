@@ -1,2 +1,2 @@
-.All notes,55,23,1,
-dsvz
+.All notes,a,b,c,d,e,f,g,
+đá lạnh

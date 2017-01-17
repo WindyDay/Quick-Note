@@ -220,6 +220,28 @@ public:
 
 	int loadFromFile()
 	{
+		if (CreateDirectory(NOTE_DATA_FOLDER, NULL) ||
+			ERROR_ALREADY_EXISTS == GetLastError())
+		{
+			// CopyFile(...)
+		}
+		else
+		{
+			// Failed to create directory.
+		}
+
+		if (CreateDirectory(L"TagData", NULL) ||
+			ERROR_ALREADY_EXISTS == GetLastError())
+		{
+			// CopyFile(...)
+		}
+		else
+		{
+			// Failed to create directory.
+		}
+
+
+
 		wfstream fileTag;
 		fileTag.open(TAG_PATH);
 		if (!fileTag.is_open())
